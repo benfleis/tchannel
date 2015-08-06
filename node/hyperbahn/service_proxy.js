@@ -27,6 +27,7 @@ var clean = require('../lib/statsd-clean').clean;
 var util = require('util');
 var RateLimiter = require('../rate_limiter');
 var Circuits = require('../circuits');
+var states = require('../states');
 var ServiceHealthProxy = require('./service_health_proxy');
 
 var DEFAULT_LOG_GRACE_PERIOD = 5 * 60 * 1000;
@@ -52,13 +53,20 @@ function ServiceDispatchHandler(options) {
     self.permissionsCache = options.permissionsCache;
     self.serviceReqDefaults = options.serviceReqDefaults || {};
 
-    self.circuits = options.circuitsConfig && options.circuitsConfig.enabled ? new Circuits({
+    self.circuitsEnabled = options.circuitsConfig && options.circuitsConfig.enabled;
+    self.circuits = new Circuits({
         timeHeap: self.channel.timeHeap,
         timers: self.channel.timers,
         random: self.random,
         egressNodes: self.egressNodes,
         config: options.circuitsConfig
-    }) : null;
+    });
+
+    if (self.circuitsEnabled) {
+        self.enableCircuits();
+    } else {
+        self.disableCircuits();
+    }
 
     self.servicePurgePeriod = options.servicePurgePeriod ||
         SERVICE_PURGE_PERIOD;
@@ -76,12 +84,10 @@ function ServiceDispatchHandler(options) {
 
     self.egressNodes.on('membershipChanged', onMembershipChanged);
 
-    if (self.circuits) {
-        self.circuits.circuitStateChangeEvent.on(onCircuitStateChange);
-    }
+    self.circuits.circuitStateChangeEvent.on(onCircuitStateChange);
 
     function onCircuitStateChange(stateChange) {
-        self.handleCircuitStateChange(stateChange);
+        self.onCircuitStateChange(stateChange);
     }
 
     function onMembershipChanged() {
@@ -252,7 +258,7 @@ function createServiceChannel(serviceName) {
     var handler = new RelayHandler(svcchan);
 
     // Decorate a circuit health monitor to egress request handlers.
-    if (mode === 'exit' && self.circuits) {
+    if (mode === 'exit') {
         handler = new ServiceHealthProxy({
             nextHandler: handler,
             circuits: self.circuits
@@ -327,9 +333,7 @@ function updateServiceChannels() {
         }
     }
 
-    if (self.circuits) {
-        self.circuits.updateServices();
-    }
+    self.circuits.updateServices();
 };
 
 ServiceDispatchHandler.prototype.updateServiceChannel =
@@ -472,8 +476,8 @@ function isExitFor(serviceName) {
     return chan.serviceProxyMode === 'exit';
 };
 
-ServiceDispatchHandler.prototype.handleCircuitStateChange =
-function handleCircuitStateChange(change) {
+ServiceDispatchHandler.prototype.onCircuitStateChange =
+function onCircuitStateChange(change) {
     var self = this;
 
     var circuit = change.circuit;
@@ -534,6 +538,18 @@ function destroy() {
     var self = this;
     self.channel.timers.clearTimeout(self.servicePurgeTimer);
     self.rateLimiter.destroy();
+};
+
+ServiceDispatchHandler.prototype.enableCircuits =
+function enableCircuits() {
+    var self = this;
+    self.circuits.reset(states.HealthyState);
+};
+
+ServiceDispatchHandler.prototype.disableCircuits =
+function disableCircuits() {
+    var self = this;
+    self.circuits.reset(states.LockedHealthyState);
 };
 
 ServiceDispatchHandler.prototype.enableRateLimiter =

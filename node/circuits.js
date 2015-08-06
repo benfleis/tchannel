@@ -66,7 +66,7 @@ EndpointCircuits.prototype.getCircuit = function getCircuit(callerName, serviceN
         circuit.stateChangedEvent.on(function circuitStateChanged(states) {
             self.root.emitCircuitStateChange(circuit, states);
         });
-        circuit.setState(states.HealthyState);
+        circuit.setState(self.root.defaultState);
         self.circuitsByEndpointName['$' + endpointName] = circuit;
     }
     return circuit;
@@ -79,6 +79,16 @@ EndpointCircuits.prototype.collectCircuitTuples = function collectCircuitTuples(
         var endpointName = endpointNames[index];
         var circuit = self.circuitsByEndpointName[endpointName];
         tuples.push([circuit.callerName, circuit.serviceName, circuit.endpointName]);
+    }
+};
+
+EndpointCircuits.prototype.reset = function reset(State) {
+    var self = this;
+    var endpointNames = Object.keys(self.circuitsByEndpointName);
+    for (var index = 0; index < endpointNames.length; index++) {
+        var endpointName = endpointNames[index];
+        var circuit = self.circuitsByEndpointName[endpointName];
+        circuit.setState(State);
     }
 };
 
@@ -108,9 +118,20 @@ ServiceCircuits.prototype.collectCircuitTuples = function collectCircuitTuples(t
     }
 };
 
+ServiceCircuits.prototype.reset = function reset(State) {
+    var self = this;
+    var callerNames = Object.keys(self.circuitsByCallerName);
+    for (var index = 0; index < callerNames.length; index++) {
+        var callerName = callerNames[index];
+        var circuit = self.circuitsByCallerName[callerName];
+        circuit.reset(State);
+    }
+};
+
 function Circuits(options) {
     var self = this;
     EventEmitter.call(self);
+    self.defaultState = states.HealthyState;
     self.circuitStateChangeEvent = self.defineEvent('circuitStateChange');
     self.circuitsByServiceName = {};
     self.config = options.config || {};
@@ -149,6 +170,18 @@ Circuits.prototype.getCircuitTuples = function getCircuitTuples() {
         self.circuitsByServiceName[serviceName].collectCircuitTuples(tuples);
     }
     return tuples;
+};
+
+Circuits.prototype.reset = function reset(State) {
+    var self = this;
+    // So all subsequently created circuits adopt the given state initially
+    self.defaultState = State;
+    // Then set all circuits to the new initial state
+    var serviceNames = Object.keys(self.circuitsByServiceName);
+    for (var index = 0; index < serviceNames.length; index++) {
+        var serviceName = serviceNames[index];
+        self.circuitsByServiceName[serviceName].reset(State);
+    }
 };
 
 Circuits.prototype.handleRequest = function handleRequest(req, buildRes, nextHandler) {
