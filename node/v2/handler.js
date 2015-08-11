@@ -197,12 +197,7 @@ TChannelV2Handler.prototype.handleCallRequest = function handleCallRequest(reqFr
         return;
     }
 
-    var handled = self._handleCallFrame(req, reqFrame);
-    if (handled) {
-        var hasMoreFrames = reqFrame.body.flags & v2.CallFlags.Fragment;
-        if (hasMoreFrames) {
-            self.streamingReq[req.id] = req;
-        }
+    if (self._handleCallFrame(req, reqFrame, self.streamingReq)) {
         self.callIncomingRequestEvent.emit(self, req);
     }
 
@@ -352,12 +347,7 @@ TChannelV2Handler.prototype.handleCallResponse = function handleCallResponse(res
     self.emitBytesRecvd(resFrame);
 
     res.remoteAddr = self.remoteName;
-    var handled = self._handleCallFrame(res, resFrame);
-    if (handled) {
-        var hasMoreFrames = resFrame.body.flags & v2.CallFlags.Fragment;
-        if (hasMoreFrames) {
-            self.streamingRes[res.id] = res;
-        }
+    if (self._handleCallFrame(res, resFrame, self.streamingRes)) {
         self.callIncomingResponseEvent.emit(self, res);
     }
 };
@@ -380,12 +370,7 @@ TChannelV2Handler.prototype.handleCallRequestCont = function handleCallRequestCo
         return self.errorEvent.emit(self, new Error('call request cont for unknown request')); // TODO typed error
     }
 
-    self._handleCallFrame(req, reqFrame);
-
-    var isLast = !(reqFrame.body.flags & v2.CallFlags.Fragment);
-    if (isLast) {
-        delete self.streamingReq[reqFrame.id];
-    }
+    self._handleCallFrame(req, reqFrame, self.streamingReq);
 
     var channel = self.connection.channel;
     channel.emitFastStat(channel.buildStat(
@@ -429,12 +414,7 @@ TChannelV2Handler.prototype.handleCallResponseCont = function handleCallResponse
 
     self.emitBytesRecvd(resFrame);
 
-    self._handleCallFrame(res, resFrame);
-
-    var isLast = !(resFrame.body.flags & v2.CallFlags.Fragment);
-    if (isLast) {
-        delete self.streamingRes[resFrame.id];
-    }
+    self._handleCallFrame(res, resFrame, self.streamingRes);
 };
 
 TChannelV2Handler.prototype.handleClaim = function handleClaim(frame) {
@@ -488,7 +468,7 @@ TChannelV2Handler.prototype._checkCallFrame = function _checkCallFrame(r, frame)
     return frame.body.verifyChecksum(checksum.val);
 };
 
-TChannelV2Handler.prototype._handleCallFrame = function _handleCallFrame(r, frame) {
+TChannelV2Handler.prototype._handleCallFrame = function _handleCallFrame(r, frame, streamingColl) {
     var self = this;
 
     var isLast = true;
@@ -506,6 +486,13 @@ TChannelV2Handler.prototype._handleCallFrame = function _handleCallFrame(r, fram
         // TODO wrap context
         r.errorEvent.emit(r, err);
         return false;
+    }
+
+    if (isLast) {
+        delete streamingColl[r.id];
+    } else {
+        assert(!streamingColl[r.id] || streamingColl[r.id] === r);
+        streamingColl[r.id] = r;
     }
 
     return true;
