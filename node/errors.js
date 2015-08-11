@@ -575,10 +575,14 @@ module.exports.classify = function classify(err) {
         case 'tchannel-json-handler.parse-error.head-failed':
         case 'tchannel-thrift-handler.parse-error.body-failed':
         case 'tchannel-thrift-handler.parse-error.head-failed':
+        case 'tchannel.arg-chunk.gap':
+        case 'tchannel.arg-chunk.out-of-order':
         case 'tchannel.arg1-over-length-limit':
         case 'tchannel.argstream.exceeded-frame-parts':
         case 'tchannel.checksum':
         case 'tchannel.duplicate-header-key':
+        case 'tchannel.handler.incoming-req-as-header-required':
+        case 'tchannel.handler.incoming-req-cn-header-required':
         case 'tchannel.http-handler.to-buffer-arg2.req-failed':
         case 'tchannel.http-handler.to-buffer-arg2.res-failed':
         case 'tchannel.null-key':
@@ -586,12 +590,8 @@ module.exports.classify = function classify(err) {
         case 'tchannel.request-frame-state':
             return 'BadRequest';
 
-        case 'tchannel.arg-chunk.gap':
-        case 'tchannel.arg-chunk.out-of-order':
         case 'tchannel.argstream.finished':
         case 'tchannel.argstream.unimplemented':
-        case 'tchannel.handler.incoming-req-as-header-required':
-        case 'tchannel.handler.incoming-req-cn-header-required':
         case 'tchannel.init.call-request-before-init-request':
         case 'tchannel.init.call-request-cont-before-init-request':
         case 'tchannel.init.call-response-before-init-response':
