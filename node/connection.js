@@ -255,6 +255,12 @@ TChannelConnection.prototype.onHandlerError = function onHandlerError(err) {
     var self = this;
 
     if (err) {
+
+        // TODO: does / can .resetAll do this for us?
+        if (errors.classify(err) === 'ProtocolError') {
+            self.sendProtocolError('read', err);
+        }
+
         self.resetAll(err);
     }
 };
