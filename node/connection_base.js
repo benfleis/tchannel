@@ -91,16 +91,16 @@ function connBaseRequest(options) {
 
 TChannelConnectionBase.prototype.handleCallRequest = function handleCallRequest(req) {
     var self = this;
-    
+
     self.ops.addInReq(req);
 
     req.remoteAddr = self.remoteName;
-    req.errorEvent.on(onReqError);
+    req.errorEvent.on(onInReqError);
 
     process.nextTick(runHandler);
 
-    function onReqError(err) {
-        self.onReqError(req, err);
+    function onInReqError(err) {
+        self.onInReqError(req, err);
     }
 
     function runHandler() {
@@ -108,8 +108,9 @@ TChannelConnectionBase.prototype.handleCallRequest = function handleCallRequest(
     }
 };
 
-TChannelConnectionBase.prototype.onReqError = function onReqError(req, err) {
+TChannelConnectionBase.prototype.onInReqError = function onInReqError(req, err) {
     var self = this;
+
     if (!req.res) self.buildResponse(req, {});
     if (err.type === 'tchannel.timeout' ||
         err.type === 'tchannel.request.timeout'
