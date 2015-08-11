@@ -193,16 +193,7 @@ TChannelV2Handler.prototype.handleCallRequest = function handleCallRequest(reqFr
 
     var err = self.checkCallReqFrame(reqFrame);
     if (err) {
-        req.res = self.buildOutResponse(req);
-        var codeName = errors.classify(err) || 'ProtocolError';
-        // TODO: would UnexpectedError be a better default?
-        // - on the one hand, if the error isn't classified, we may be safer
-        //   "failing closed" and terminating the connection
-        // - on the other hand, that may be too heavy handed for a forwarding
-        //   entity, since it may cause undue connection thrashing in the
-        //   presence of bad actors
-        // all the more reason to kill every "TODO typed error"
-        self.sendErrorFrame(req.res, codeName, err.message);
+        req.errorEvent.emit(req, err);
         return;
     }
 
@@ -339,7 +330,7 @@ TChannelV2Handler.prototype.handleCallResponse = function handleCallResponse(res
 
     var err = self.checkCallResFrame(resFrame);
     if (err) {
-        self.errorEvent.emit(self, err);
+        res.errorEvent.emit(res, err);
         return;
     }
 
@@ -513,7 +504,7 @@ TChannelV2Handler.prototype._handleCallFrame = function _handleCallFrame(r, fram
 
     if (err) {
         // TODO wrap context
-        self.errorEvent.emit(self, err);
+        r.errorEvent.emit(r, err);
         return false;
     }
 
@@ -878,7 +869,9 @@ TChannelV2Handler.prototype.onReqError = function onReqError(err, req) {
     var self = this;
 
     var codeName = errors.classify(err);
-    if (codeName) {
+    if (codeName &&
+        codeName !== 'ProtocolError'
+    ) {
         // TODO: move req to error state?
         req.res = self.buildOutResponse(req);
         self.sendErrorFrame(req.res, codeName, err.message);
@@ -890,9 +883,16 @@ TChannelV2Handler.prototype.onReqError = function onReqError(err, req) {
 TChannelV2Handler.prototype.onResError = function onResError(err, res) {
     var self = this;
 
-    // TODO: wrap errors to clarify "errors on responses to req..." ?
-    var req = self.connection.ops.getOutReq(res.id);
-    req.errorEvent.emit(req, err);
+    var codeName = errors.classify(err);
+    if (codeName &&
+        codeName !== 'ProtocolError'
+    ) {
+        // TODO: wrap errors to clarify "errors on responses to req..." ?
+        var req = self.connection.ops.getOutReq(res.id);
+        req.errorEvent.emit(req, err);
+    } else {
+        self.errorEvent.emit(self, err);
+    }
 };
 
 /*jshint maxparams:10*/
