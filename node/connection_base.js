@@ -86,7 +86,12 @@ function connBaseRequest(options) {
     var req = self.buildOutRequest(options);
     self.ops.addOutReq(req);
     req.peer.invalidateScore();
+    req.errorEvent.on(onOutReqError);
     return req;
+
+    function onOutReqError(err) {
+        self.onOutReqError(req, err);
+    }
 };
 
 TChannelConnectionBase.prototype.handleCallRequest = function handleCallRequest(req) {
@@ -106,6 +111,12 @@ TChannelConnectionBase.prototype.handleCallRequest = function handleCallRequest(
     function runHandler() {
         self.runHandler(req);
     }
+};
+
+TChannelConnectionBase.prototype.onOutReqError = function onOutReqError(req, err) {
+    var self = this;
+
+    self.ops.popOutReq(req.id);
 };
 
 TChannelConnectionBase.prototype.onInReqError = function onInReqError(req, err) {
