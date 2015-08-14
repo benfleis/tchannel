@@ -894,6 +894,7 @@ TChannelV2Handler.prototype.buildInRequest = function buildInRequest(reqFrame) {
     }
 };
 
+// TODO: move to InRequest.Options
 /*jshint maxparams:10*/
 function InRequestOptions(
     channel, timeout, tracing, serviceName, headers, checksum,

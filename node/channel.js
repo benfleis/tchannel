@@ -660,6 +660,7 @@ TChannel.prototype.request = function channelRequest(options) {
     return self._request(opts);
 };
 
+// TODO: move to Request.Options
 function RequestOptions(channel, opts) {
     /*eslint complexity: [2, 30]*/
     var self = this;
